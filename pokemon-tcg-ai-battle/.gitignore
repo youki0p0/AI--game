@@ -1,0 +1,18 @@
+# Kaggle データ・大容量物
+data/*
+!data/.gitkeep
+submissions/*
+!submissions/.gitkeep
+
+# モデル・チェックポイント
+*.pt
+*.pth
+*.ckpt
+*.h5
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
