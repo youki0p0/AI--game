@@ -1,6 +1,3 @@
-# 確認用の使い捨てプレビュー
-out/_*.png
-
 # Jen runtime state
 .jen/
 .claude/worktrees/

@@ -1,0 +1,31 @@
+name: Jen CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Node
+        id: node
+        run: |
+          if [ -f package.json ]; then echo "has_node=true" >> "$GITHUB_OUTPUT"; else echo "has_node=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Setup Node
+        if: steps.node.outputs.has_node == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        if: steps.node.outputs.has_node == 'true'
+        run: npm ci
+
+      - name: Run Jen quality gate
+        run: bash .claude/skills/jen/scripts/jen_quality_gate.sh
