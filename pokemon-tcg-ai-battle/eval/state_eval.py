@@ -311,6 +311,25 @@ def _special_condition_score(player: Any, w: Weights) -> float:
     return s
 
 
+def _effective_damage(attacker: Any, defender: Any) -> float:
+    """概算ダメージに弱点(x2)/抵抗(-30)を反映。型は attacker のポケモン型で近似。"""
+    dmg = float(_best_attack_damage(attacker))
+    if dmg <= 0:
+        return dmg
+    ad = _card_data(_g(attacker, "id"))
+    dd = _card_data(_g(defender, "id"))
+    if ad is None or dd is None:
+        return dmg
+    atk_type = _g(ad, "energyType")
+    weak = _g(dd, "weakness")
+    resist = _g(dd, "resistance")
+    if weak is not None and atk_type is not None and atk_type == weak:
+        dmg *= 2.0
+    elif resist is not None and atk_type is not None and atk_type == resist:
+        dmg = max(0.0, dmg - 30.0)
+    return dmg
+
+
 def threat(current: Any, my_index: int, w: Weights) -> float:
     """脅威/テンポ: KO 可能性と状態異常。
 
@@ -331,7 +350,7 @@ def threat(current: Any, my_index: int, w: Weights) -> float:
 
     # 自分 -> 相手
     if my_act is not None and op_act is not None:
-        dmg = _best_attack_damage(my_act)
+        dmg = _effective_damage(my_act, op_act)
         op_hp = float(_g(op_act, "hp", 0) or 0)
         if op_hp > 0:
             if dmg >= op_hp:
@@ -342,7 +361,7 @@ def threat(current: Any, my_index: int, w: Weights) -> float:
 
     # 相手 -> 自分
     if op_act is not None and my_act is not None:
-        dmg = _best_attack_damage(op_act)
+        dmg = _effective_damage(op_act, my_act)
         my_hp = float(_g(my_act, "hp", 0) or 0)
         if my_hp > 0:
             if dmg >= my_hp:
