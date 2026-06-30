@@ -26,8 +26,10 @@ SC_PLACEMENT = {1, 2, 3, 4, 5, 6}  # SETUP_ACTIVE/BENCH, SWITCH, TO_ACTIVE/BENCH
 AREA_ACTIVE = 4
 ENERGY_PSY = 5
 IRON_BOULDER = 971
-ATTACKER_PRIORITY = [971, 431, 184, 216, 764, 765]
+ATTACKER_PRIORITY = [971, 184, 431, 216, 764, 765]
 GUST_TARGET_PRIORITY = [678, 674, 676, 675, 677, 673]  # pull Lucario (3 prizes) first
+OHKO_THREATS = {971, 184}   # Iron Boulder / Latias ex: OHKO Lucario via weakness
+SWITCH_CARD = 1123
 
 
 def _opt(o: Any, k: str, default=None):

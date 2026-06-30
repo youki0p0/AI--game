@@ -19,22 +19,27 @@ from .state_eval import state_eval
 # --- Psychic anti-Fighting deck (60 cards) ---------------------------------
 PSY_ENERGY = 5
 PSY_DECK: list[int] = (
-    # v3 (relatively best, stable): mixed cheap + bulky Psychic attackers + consistency
-    # Note: measured ~0.45 (noisy). v5 "survivable-only ex" build measured 0.19 at 200 games
-    # (slow 3-energy ex attackers give up too many prizes); reverted to v3.
-    [971] * 4      # Iron Boulder   : 170 for {P}{C}, HP140, 1-prize, OHKOs Lucario 340
-    + [431] * 4    # TR's Mewtwo ex : 160 for {P}{P}{C}, HP280 tank
-    + [184] * 4    # Latias ex      : 200 for {P}{P}{C}, HP210
-    + [216] * 4    # Mesprit        : 160 for {P}{P}, HP70 cheap hitter
-    + [764] * 4    # Cresselia      : HP120 pivot
-    + [765] * 4    # Meloetta       : utility basic
+    # v6: COMPETITIVE RATIOS (real-meta stats): ~18 Pokémon / ~30 Trainers / ~12 Energy.
+    # Prior homebrews ran 20-24 energy + ~16 trainers (opposite of meta) -> too slow.
+    # Pokémon (18)
+    [971] * 4      # Iron Boulder   : 170/{P}{C}, HP140, 1-prize, OHKOs Lucario 340 (Future)
+    + [184] * 4    # Latias ex      : 200/{P}{P}{C}, HP210 OHKO
+    + [216] * 4    # Mesprit        : 160/{P}{P}, HP70 cheap 2-energy hitter
+    + [431] * 4    # TR's Mewtwo ex : 160/{P}{P}{C}, HP280 tank
+    + [764] * 2    # Cresselia      : backup
+    # Trainers (30): heavy draw + search (meta-style consistency)
+    + [1224] * 4   # Cheren         : draw 3
     + [1192] * 4   # Carmine        : draw
+    + [1213] * 4   # Judge          : draw 4 / disrupt
+    + [1125] * 4   # Master Ball    : search ANY Pokémon -> hand
+    + [1152] * 4   # Poké Pad       : search non-ex Pokémon (Iron Boulder)
     + [1102] * 4   # Dusk Ball      : search Pokémon
-    + [1152] * 4   # Poké Pad       : draw
-    + [1123] * 4   # Switch         : mobility
-    + [PSY_ENERGY] * 20
+    + [1123] * 4   # Switch         : mobility (promote Iron Boulder)
+    + [1182] * 2   # Boss's Orders  : gust Lucario for OHKO
+    # Energy (12)
+    + [PSY_ENERGY] * 12
 )
-ATTACKER_PRIORITY = [971, 431, 184, 216, 764, 765]
+ATTACKER_PRIORITY = [971, 184, 431, 216, 764, 765]
 # Opponent gust priority (unused in stable build; kept for future Boss's Orders)
 GUST_TARGET_PRIORITY = [678, 674, 676, 675, 677, 673]
 assert len(PSY_DECK) == 60, len(PSY_DECK)
