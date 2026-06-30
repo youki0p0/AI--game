@@ -19,11 +19,13 @@ from .state_eval import state_eval
 # --- Psychic anti-Fighting deck (60 cards) ---------------------------------
 PSY_ENERGY = 5
 PSY_DECK: list[int] = (
-    # stable build (v3): all-basic Psychic attackers + generic consistency trainers
-    [971] * 4      # Iron Boulder   : 170 for {P}{C}, HP140 (survives Aura Jab 130, OHKOs Lucario 340)
+    # v3 (relatively best, stable): mixed cheap + bulky Psychic attackers + consistency
+    # Note: measured ~0.45 (noisy). v5 "survivable-only ex" build measured 0.19 at 200 games
+    # (slow 3-energy ex attackers give up too many prizes); reverted to v3.
+    [971] * 4      # Iron Boulder   : 170 for {P}{C}, HP140, 1-prize, OHKOs Lucario 340
     + [431] * 4    # TR's Mewtwo ex : 160 for {P}{P}{C}, HP280 tank
     + [184] * 4    # Latias ex      : 200 for {P}{P}{C}, HP210
-    + [216] * 4    # Mesprit        : 160 for {P}{P}, HP70
+    + [216] * 4    # Mesprit        : 160 for {P}{P}, HP70 cheap hitter
     + [764] * 4    # Cresselia      : HP120 pivot
     + [765] * 4    # Meloetta       : utility basic
     + [1192] * 4   # Carmine        : draw
@@ -32,7 +34,6 @@ PSY_DECK: list[int] = (
     + [1123] * 4   # Switch         : mobility
     + [PSY_ENERGY] * 20
 )
-# Our attacker priority for setup/promotion
 ATTACKER_PRIORITY = [971, 431, 184, 216, 764, 765]
 # Opponent gust priority (unused in stable build; kept for future Boss's Orders)
 GUST_TARGET_PRIORITY = [678, 674, 676, 675, 677, 673]
