@@ -1,50 +1,72 @@
-# Pokémon TCG AI Battle Challenge
+# Pokémon TCG AI Battle Challenge（Simulation）
 
 Kaggle コンペ **「The Pokémon Company - PTCG AI Battle Challenge Simulation」** の作業フォルダ。
 
-- コンペURL: https://www.kaggle.com/competitions/pokemon-tcg-ai-battle
+- コンペ: https://www.kaggle.com/competitions/pokemon-tcg-ai-battle
 - データ: https://www.kaggle.com/competitions/pokemon-tcg-ai-battle/data
+- **APIドキュメント（CABT）**: https://matsuoinstitute.github.io/cabt/
 
-> ⚠️ コンペの詳細（ルール・評価指標・提出形式）はログインが必要なため、
-> データ取得後にこの README を正式版へ更新する。下記は一般的なシミュレーション
-> 系（対戦エージェント提出）コンペを想定した暫定構成。
+## コンペ概要
+
+ポケモンカードゲーム（TCG）の対戦AI（Training Agent）を作って競う**シミュレーション競技**。
+確率・不確定情報・戦略立案が勝敗を分ける環境で、競技用シミュレータ上でエージェント同士を対戦させる。
+
+- 基盤: **kaggle-environments** 上に構築された対戦シミュレータ
+- エージェントの動作: **毎ターン observation（ゲームログ＋盤面＋合法手リスト）を受け取り、選択する手の「インデックス」を返す**
+  - エンジンは常に合法手のみを提示するので、非合法手の心配は不要
+- 公式ポケモンTCGルールと一部差異あり（CABTドキュメント参照）
+
+## 評価・提出の仕組み
+
+- 1チームあたり**1日最大5エージェント**を提出可能
+- 各提出はラダー上で**近いレーティングの相手**とエピソード（対戦）を行い、勝ちで上昇・負けで下降・引き分けで均衡（Elo的）
+- 集計対象は**最新2提出**（最終提出にも使用）
+- 競技自体に賞金はないが、**Hackathonトラックにレポート提出**すると賞の対象。最終順位は競技リーダーボード＋Hackathon評価の両方で決定（Hackathon参加は任意・本競技とは別）
+
+## タイムライン（2026年）
+
+| 日付 | 内容 |
+|---|---|
+| 6/16 | 開始 |
+| 8/9 | エントリー締切 / チームマージ締切（この日までにルール同意が必要） |
+| 8/16 | **最終提出締切** |
+| 8/17〜8/末頃 | 対戦継続・最終集計 |
 
 ## フォルダ構成
 
 ```
 pokemon-tcg-ai-battle/
-├── README.md          このファイル
-├── data/              Kaggle から取得したデータ（Git 管理外）
-├── notebooks/         分析・実験用ノートブック
-├── src/               エージェント本体・共通コード
-│   └── agent.py       提出するエージェントのひな型
-└── submissions/       提出物（Git 管理外）
+├── README.md
+├── requirements.txt
+├── data/              Kaggle データ（Git管理外）
+├── notebooks/         分析・実験
+├── src/
+│   ├── agent.py       方策ロジック（合法手 → 選択index）
+│   └── main.py        kaggle-environments 提出エントリ
+└── submissions/       提出物（Git管理外）
 ```
 
 ## セットアップ
 
 ```bash
-# Kaggle CLI（未導入の場合）
-pip install kaggle
+pip install -r requirements.txt   # kaggle, kaggle-environments など
 
-# APIトークンを ~/.kaggle/kaggle.json に配置（Kaggleのアカウント設定から取得）
-chmod 600 ~/.kaggle/kaggle.json
-
-# コンペ規約に同意した上でデータ取得
+# Kaggle APIトークンを ~/.kaggle/kaggle.json に配置（権限600）
 cd pokemon-tcg-ai-battle
 kaggle competitions download -c pokemon-tcg-ai-battle -p data/
 unzip -o "data/*.zip" -d data/
 ```
 
-## 進め方（暫定）
+## 進め方
 
-1. `data/` を取得し、配布物（ルールエンジン / サンプルエージェント / 提出仕様）を確認
-2. この README に正式なルール・評価指標・提出形式を追記
-3. `src/agent.py` のひな型に方策（ルールベース → 探索 / 学習）を実装
-4. ローカルで対戦シミュレーションを回して検証
-5. `submissions/` に提出物を生成して提出
+1. `data/` を取得し、CABTドキュメント（observation/action の具体仕様・カードデータ）を確認
+2. `src/agent.py` の `choose_action` を観測スキーマに合わせて実装
+   - まずは**ルールベース**（攻撃可能なら最大ダメージ手を選ぶ等）でベースラインを作る
+   - 次に**探索（先読み）／学習**を検討
+3. ローカルで `kaggle-environments` を使って自己対戦させ検証
+4. `main.py` を提出（Notebook 経由 or CLI）。1日5回まで → 上位2提出が残る
 
 ## メモ
 
-- 学習・探索を入れる場合は依存（numpy 等）を `requirements.txt` に追記する
+- observation/action の正確なスキーマはデータ取得・CABTドキュメント確認後に確定する
 - 大きなデータ・モデルはコミットしない（`.gitignore` 済み）
