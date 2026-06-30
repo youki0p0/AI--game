@@ -131,6 +131,7 @@ def play_game(
     deck0: list[int] | None = None,
     deck1: list[int] | None = None,
     max_steps: int = 20000,
+    observer: Callable[[dict, int], None] | None = None,
 ) -> int:
     """Play a single game between two agents and return the result.
 
@@ -185,6 +186,10 @@ def play_game(
             serial_data = lib.GetBattleData(Battle.battle_ptr)
             acting_player = int(serial_data.selectPlayer)  # 0 or 1
             agent = agent0 if acting_player == 0 else agent1
+
+            # Optional observer hook (e.g. record state_eval per decision) -------
+            if observer is not None and current is not None:
+                observer(current, acting_player)
 
             # Deck-selection phase: select is None and current is None ----------
             select = obs.get("select") if obs else None
