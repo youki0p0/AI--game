@@ -444,3 +444,235 @@ def make_buddy_rollout_agent(
         return [best_i] if best_i is not None else _buddy_real(obs)
 
     return agent
+
+
+# ---------------------------------------------------------------------------
+# Monte-Carlo agent: roll each option out to the GAME END with buddy on both
+# sides; value = actual win/loss.  No heuristic leaf eval (removes that bottleneck).
+# ---------------------------------------------------------------------------
+
+def make_mc_agent(rollouts: int = 1, end_budget: int = 3000) -> Callable[[dict], list[int]]:
+    from .agents_buddy import load_buddy_agent
+
+    roll_buddy = load_buddy_agent()
+
+    def _reset() -> None:
+        gl = roll_buddy.__globals__
+        if "pre_turn" in gl:
+            gl["pre_turn"] = -1
+
+    def _buddy_on(observation: Any) -> list[int]:
+        d = _to_plain(observation)
+        d["search_begin_input"] = None
+        try:
+            return roll_buddy(d)
+        except Exception:
+            sel = observation.select
+            return [0] if (sel and sel.option) else []
+
+    def _buddy_real(obs: dict) -> list[int]:
+        _reset()
+        try:
+            return roll_buddy(obs)
+        except Exception:
+            sel = obs.get("select")
+            return [0] if (sel and sel.get("option")) else []
+
+    def agent(obs: dict) -> list[int]:
+        sel = obs.get("select")
+        if sel is None:
+            return _deck()
+        options = sel.get("option") or []
+        n = len(options)
+        if n == 0:
+            return []
+        if n == 1:
+            return [0]
+        cur = obs.get("current")
+        if cur is None:
+            return _buddy_real(obs)
+        me = cur["yourIndex"]
+        if int(sel.get("maxCount", 1) or 1) > 1:
+            return _buddy_real(obs)
+
+        rec = _reconstruct(obs)
+        if rec is None:
+            return _buddy_real(obs)
+
+        _ensure_engine_on_path()
+        import cg.api as api  # noqa: PLC0415
+
+        def rollout_to_end(ns: Any) -> float:
+            for _ in range(end_budget):
+                c = ns.observation.current
+                if c is None:
+                    return 0.5
+                r = getattr(c, "result", -1)
+                if r != -1:
+                    return 1.0 if r == me else (0.0 if r == (1 - me) else 0.5)
+                s = ns.observation.select
+                if s is None or not s.option:
+                    return 0.5
+                try:
+                    ns = api.search_step(ns.searchId, _buddy_on(ns.observation))
+                except Exception:
+                    return 0.5
+            return 0.5
+
+        scores = [0.0] * n
+        try:
+            for _m in range(max(1, rollouts)):
+                try:
+                    ob = api.to_observation_class(obs)
+                    root = api.search_begin(
+                        ob, rec["your_deck"], rec["your_prize"],
+                        rec["opp_deck"], rec["opp_prize"], rec["opp_hand"], rec["opp_active"],
+                    )
+                except Exception:
+                    return _buddy_real(obs)
+                for i in range(n):
+                    try:
+                        ns = api.search_step(root.searchId, [i])
+                    except Exception:
+                        scores[i] += 0.0
+                        continue
+                    _reset()
+                    scores[i] += rollout_to_end(ns)
+                api.search_end()
+        except Exception:
+            return _buddy_real(obs)
+
+        best_i = max(range(n), key=lambda i: scores[i])
+        return [best_i]
+
+    return agent
+
+
+# ---------------------------------------------------------------------------
+# Guarded buddy improver: play buddy's move by default; override ONLY when a
+# rollout (buddy on both sides) shows a clearly better option (> margin).
+# Designed to never do worse than buddy except on confident improvements.
+# ---------------------------------------------------------------------------
+
+def make_guarded_buddy_agent(
+    margin: float = 400.0,
+    n_turns: int = 2,
+    rollout_budget: int = 40,
+    leaf_eval: Callable[[Any, int], float] = state_eval,
+) -> Callable[[dict], list[int]]:
+    from .agents_buddy import load_buddy_agent
+
+    real_buddy = load_buddy_agent()   # tracks the real game (coherent state)
+    roll_buddy = load_buddy_agent()   # rollout policy
+
+    def _reset() -> None:
+        gl = roll_buddy.__globals__
+        if "pre_turn" in gl:
+            gl["pre_turn"] = -1
+
+    def _buddy_on(observation: Any) -> list[int]:
+        d = _to_plain(observation)
+        d["search_begin_input"] = None
+        try:
+            return roll_buddy(d)
+        except Exception:
+            sel = observation.select
+            return [0] if (sel and sel.option) else []
+
+    def agent(obs: dict) -> list[int]:
+        bc = real_buddy(obs)  # buddy's real choice (keeps its state coherent)
+        sel = obs.get("select")
+        if sel is None:
+            return bc
+        options = sel.get("option") or []
+        n = len(options)
+        cur = obs.get("current")
+        if n <= 1 or cur is None or int(sel.get("maxCount", 1) or 1) > 1:
+            return bc
+        me = cur["yourIndex"]
+        rec = _reconstruct(obs)
+        if rec is None:
+            return bc
+        try:
+            bc_idx = int(bc[0]) if bc else 0
+        except Exception:
+            return bc
+        if not (0 <= bc_idx < n):
+            return bc
+
+        _ensure_engine_on_path()
+        import cg.api as api  # noqa: PLC0415
+
+        def leaf_value(ns: Any) -> float:
+            c = ns.observation.current
+            if c is None:
+                return 0.0
+            res = getattr(c, "result", -1)
+            if res != -1:
+                return 1e9 if res == me else (-1e9 if res == (1 - me) else 0.0)
+            return float(leaf_eval(c, me))
+
+        def play_actor_turn(ns: Any) -> Any:
+            c0 = ns.observation.current
+            if c0 is None:
+                return ns
+            actor = getattr(c0, "yourIndex", me)
+            for _ in range(rollout_budget):
+                c = ns.observation.current
+                if c is None or getattr(c, "result", -1) != -1:
+                    return ns
+                if getattr(c, "yourIndex", actor) != actor:
+                    return ns
+                s = ns.observation.select
+                if s is None or not s.option:
+                    return ns
+                try:
+                    ns = api.search_step(ns.searchId, _buddy_on(ns.observation))
+                except Exception:
+                    return ns
+            return ns
+
+        def option_value(idx: int) -> float | None:
+            try:
+                ns = api.search_step(root.searchId, [idx])
+            except Exception:
+                return None
+            _reset()
+            for _ in range(n_turns):
+                c = ns.observation.current
+                if c is None or getattr(c, "result", -1) != -1:
+                    break
+                ns = play_actor_turn(ns)
+            return leaf_value(ns)
+
+        try:
+            ob = api.to_observation_class(obs)
+            root = api.search_begin(
+                ob, rec["your_deck"], rec["your_prize"],
+                rec["opp_deck"], rec["opp_prize"], rec["opp_hand"], rec["opp_active"],
+            )
+        except Exception:
+            return bc
+
+        try:
+            v_bc = option_value(bc_idx)
+            if v_bc is None:
+                return bc
+            best_i, best_v = bc_idx, v_bc
+            for i in range(n):
+                if i == bc_idx:
+                    continue
+                v = option_value(i)
+                if v is not None and v > best_v:
+                    best_v, best_i = v, i
+        finally:
+            try:
+                api.search_end()
+            except Exception:
+                pass
+
+        if best_i != bc_idx and best_v > v_bc + margin:
+            return [best_i]
+        return bc
+
+    return agent

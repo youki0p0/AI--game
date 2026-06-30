@@ -27,6 +27,7 @@ AREA_ACTIVE = 4
 ENERGY_PSY = 5
 IRON_BOULDER = 971
 ATTACKER_PRIORITY = [971, 431, 184, 216, 764, 765]
+GUST_TARGET_PRIORITY = [678, 674, 676, 675, 677, 673]  # pull Lucario (3 prizes) first
 
 
 def _opt(o: Any, k: str, default=None):
@@ -54,7 +55,24 @@ def _eff_vs(attack_id: Any, attacker_type: Any, defender) -> int:
     return dmg
 
 
+# Tunable strategy flags (set by make_psy_pilot; defaults give the original agent)
+CFG = {"go_first": False, "trainers_first": True, "min_attack_dmg": 1, "hand_thin": 5}
+
+
+def make_psy_pilot(**flags):
+    cfg = dict(CFG)
+    cfg.update(flags)
+
+    def piloted(obs: dict) -> list[int]:
+        return _agent_impl(obs, cfg)
+    return piloted
+
+
 def agent(obs: dict) -> list[int]:
+    return _agent_impl(obs, CFG)
+
+
+def _agent_impl(obs: dict, cfg: dict) -> list[int]:
     sel = obs.get("select")
     cur = obs.get("current")
     if sel is None:
@@ -83,10 +101,11 @@ def agent(obs: dict) -> list[int]:
         k = min(max(mc, mn if mn > 0 else 1), n)
         return list(range(k))
 
-    # --- go SECOND (aggro attacks first) ---
+    # --- first/second choice (aggro usually prefers second) ---
     if sctx == SC_IS_FIRST:
+        want = T_YES if cfg.get("go_first") else T_NO
         for i, o in enumerate(options):
-            if _opt(o, "type") == T_NO:
+            if _opt(o, "type") == want:
                 return [i]
         return [0]
     if sctx == SC_MULLIGAN:
@@ -112,30 +131,32 @@ def agent(obs: dict) -> list[int]:
         for o in options:
             t = _opt(o, "type")
             s = 0.0
+            hand_ct = int(_g(players[me], "handCount", 0) or 0) if len(players) > me else 0
+            thin = hand_ct <= int(cfg.get("hand_thin", 5))
             if t == T_ATTACK:
                 d = _eff_vs(_opt(o, "attackId"), atk_type, opp_active)
                 oh = float(_g(opp_active, "hp", 0) or 0)
-                s = 10000 + d + (50000 if (oh > 0 and d >= oh) else 0)
-                if d <= 0:
-                    s = 200  # no-damage attack: avoid unless nothing else
+                if d >= int(cfg.get("min_attack_dmg", 1)):
+                    s = 10000 + d + (50000 if (oh > 0 and d >= oh) else 0)
+                else:
+                    s = 200  # weak/no-damage attack: avoid unless nothing else
             elif t == T_ABILITY:
                 s = 9000
             elif t == T_ATTACH:
-                # attach energy; prefer the active attacker
                 in_active = _opt(o, "inPlayArea") == AREA_ACTIVE
                 s = 8000 + (300 if in_active else 0)
             elif t == T_PLAY:
-                # play a card from hand: supporter draw / item search / basic to bench
                 card = None
                 idx = _opt(o, "index")
                 hand = _g(players[me], "hand", []) if len(players) > me else None
                 if isinstance(hand, list) and idx is not None and 0 <= idx < len(hand):
                     card = _card_data(_g(hand[idx], "id"))
                 ct = _g(card, "cardType") if card else None
+                boost = 3000 if (cfg.get("trainers_first") and thin) else 0
                 if ct == 3:        # SUPPORTER (draw)
-                    s = 6500
-                elif ct in (1, 2):  # ITEM / TOOL
-                    s = 5500
+                    s = 6500 + boost
+                elif ct in (1, 2):  # ITEM / TOOL (search/draw)
+                    s = 5500 + boost
                 else:               # basic Pokémon -> develop bench
                     s = 5000
             elif t == T_RETREAT:
@@ -149,13 +170,12 @@ def agent(obs: dict) -> list[int]:
             scores.append(s)
         return [max(range(n), key=lambda i: scores[i])]
 
-    # --- placement: choose our best attacker (bulky OHKO threats first) ---
+    # --- placement: pick our best attacker, OR (for gust) the opponent's biggest target ---
     if sctx in SC_PLACEMENT:
-        rank = {cid: i for i, cid in enumerate(ATTACKER_PRIORITY)}
-        scored = sorted(
-            range(n),
-            key=lambda i: rank.get(_opt(options[i], "cardId"), 99),
-        )
+        targets_opp = any(_opt(o, "playerIndex") == (1 - me) for o in options)
+        pri = GUST_TARGET_PRIORITY if targets_opp else ATTACKER_PRIORITY
+        rank = {cid: i for i, cid in enumerate(pri)}
+        scored = sorted(range(n), key=lambda i: rank.get(_opt(options[i], "cardId"), 99))
         if mc <= 1:
             return [scored[0]]
         return sorted(scored[:max(mc, mn)])
