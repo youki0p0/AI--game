@@ -1,0 +1,23 @@
+{
+  "mults": {
+    "prize_diff": 1.5700587440102425,
+    "w_prize_value": 2.0228891261317345,
+    "w_can_ko": 1.0,
+    "w_will_be_koed": 1.0,
+    "w_damage_ratio": 1.0,
+    "w_hp_ratio": 1.0,
+    "w_energy_ready": 1.0,
+    "w_bench": 1.0
+  },
+  "winrate": 0.4305555555555556,
+  "params": [
+    "prize_diff",
+    "w_prize_value",
+    "w_can_ko",
+    "w_will_be_koed",
+    "w_damage_ratio",
+    "w_hp_ratio",
+    "w_energy_ready",
+    "w_bench"
+  ]
+}
