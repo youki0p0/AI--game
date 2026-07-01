@@ -1,8 +1,25 @@
 # 提出パッケージ（PTCG AI Battle / Kaggle）
 
-更新: 2026-07-01（Archaludon ex + **1手読み探索パイロット** へ差し替え）
+更新: 2026-07-02（**2モデル分散ポートフォリオ**へ。最新2提出が有効なルールを活用）
 
-## ★ 提出ファイル: `dist/submission.py`（= Archaludon ex / 鋼 ＋ 探索パイロット）
+## ★★ 2モデル分散（推奨・最新2提出を両方使う）
+「最新2提出が有効」ルールを活かし、**互いの穴を埋める2つの異なる戦術**を提出する。
+
+| 枠 | ファイル | デッキ/戦術 | 役割 |
+|---|---|---|---|
+| **モデル1** | `dist/submission.py` | Archaludon ex（鋼・耐久ミッドレンジ）＋探索(深さ3) | 頻出メタ全般に強い主力 |
+| **モデル2** | `dist/submission2.py` | Mega Starmie ex（水・テンポ）＋探索(深さ3) | Archaludonの穴(Crustle壁)を埋める補完 |
+
+**補完性（探索パイロット実測）**: 各相手で"良い方"を採れる下限保証 **0.62**（＝どの相手が来ても最低1モデルが有利）。
+- Archaludon: vsGrimm 0.71 / vsAlakazam 0.62 / vsMegaStar 0.67 / vsDragapult 1.00 / **vsCrustle 0.29**
+- MegaStarmie: vsDragapult 0.96 / **vsCrustle 0.67〜0.92**（Archaludonの唯一の穴=壁を埋める。水の非ex打点がex無効壁を貫通）
+- 2つは戦術が異なる（鋼・盤面グラインド vs 水・テンポ）ので、メタが回っても両取りしにくい＝分散が効く。
+
+→ **`dist/submission.py` と `dist/submission2.py` の両方をアップロード**（最新2つが有効カウント）。
+
+---
+
+## 提出ファイル1: `dist/submission.py`（= Archaludon ex / 鋼 ＋ 探索パイロット）
 Kaggle「File Upload」に**ドラッグ&ドロップ**する単一 .py（= `submissions/archaludon_search_agent.py`）。
 
 ### Kaggle 形式適合
