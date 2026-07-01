@@ -17,8 +17,12 @@ from typing import Callable
 
 
 # --- コンテスタント(自分/相手)の構築: 名前 -> (agent_factory, deck) -------------
-def build_contestant(name: str) -> tuple[Callable[[], Callable], list[int]]:
-    """名前から (agentを返すfactory, 60枚デッキ) を作る。プロセス内で呼ぶ。"""
+def build_contestant(name: str, opp_deck: list[int] | None = None
+                     ) -> tuple[Callable[[], Callable], list[int]]:
+    """名前から (agentを返すfactory, 60枚デッキ) を作る。プロセス内で呼ぶ。
+
+    opp_deck: 探索型パイロット(相手デッキで隠れ情報を復元)に渡す。他は無視。
+    """
     from .engine_driver import _ensure_engine_on_path, _get_engine_dir
     _ensure_engine_on_path()
 
@@ -49,7 +53,7 @@ def build_contestant(name: str) -> tuple[Callable[[], Callable], list[int]]:
     if name == "dragapult_search":
         from .dragapult_deck import DRAGAPULT_DECK
         from .dragapult_search import make_dragapult_search_pilot
-        return ((lambda: make_dragapult_search_pilot()), list(DRAGAPULT_DECK))
+        return ((lambda: make_dragapult_search_pilot(opp_deck)), list(DRAGAPULT_DECK))
     # 汎用: DECKS の型デッキ + generic_pilot
     from .decks import DECKS
     from .generic_pilot import make_generic_pilot
@@ -63,8 +67,9 @@ def _run_matchup(args: tuple) -> dict:
     """1つの相手に対して N 戦（先後入替）。別プロセスで実行される。"""
     hero_name, opp_name, n_games = args
     from .engine_driver import play_game
-    hero_factory, hero_deck = build_contestant(hero_name)
     opp_factory, opp_deck = build_contestant(opp_name)
+    # 探索型 hero は相手デッキで隠れ情報を復元するため opp_deck を渡す
+    hero_factory, hero_deck = build_contestant(hero_name, opp_deck=opp_deck)
     w = l = d = 0
     for gi in range(n_games):
         if gi % 2 == 0:
