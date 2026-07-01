@@ -1,47 +1,40 @@
 # 提出パッケージ（PTCG AI Battle / Kaggle）
 
-作成: 2026-07-01 ／ ブランチ: claude/kagura-makina-image-gen-rm1hd0
+更新: 2026-07-01（実戦の完封負けを受け、堅牢な psy_champion へ差し替え）
 
-## ★ 提出ファイル（1モデル選択）: `dist/submission.py`
-Kaggle「Submit to Competition → File Upload」に **ドラッグ&ドロップ**する単一 .py。
+## ★ 提出ファイル（1モデル）: `dist/submission.py`
+Kaggle「Submit to Competition → File Upload」に**ドラッグ&ドロップ**する単一 .py。
 
-### Kaggle が要求する形式（アップロード画面より）
-> Your submission should be a python file with **the last 'def' accepting an observation
-> and returning an action.** You can also upload multiple files in a zip/gz/7z archive
-> with a `main.py` at the top level.（受理: `.py` / `.zip` / `.gz` / `.7z`）
+### Kaggle 形式への適合（アップロード画面の指示）
+> the last 'def' accepting an observation and returning an action（.py/.zip/.gz/.7z 可）
+- ✅ **ファイル末尾の唯一の最終 def = `agent(observation, configuration=None)`**（入れ子defなし・AST検証済み）
+- ✅ observation → action（デッキ選択時は60枚cardId）
+- ✅ `cg.api` のみ依存・デッキ埋め込み・相手デッキ非依存・end-to-end動作確認済み
 
-適合状況（`dist/submission.py`）:
-- ✅ **ファイル末尾の `def` が `agent(observation, configuration=None) -> list[int]`**（＝Kaggleが呼ぶエントリ）
-- ✅ observation を受け取り action（option インデックス配列 / デッキ選択時は60枚cardId）を返す
-- ✅ 依存は `cg.api`（エンジン提供）のみ・デッキ埋め込み・外部成果物不要
-- ✅ end-to-end 実対戦で動作確認済み
+## 選択モデル: psy_champion（Psychic単サイド・堅牢ヒューリスティック）
+### 差し替えの理由（実戦ログ 83005093 の教訓）
+前提出 meta_search は実戦で **Archaludon に 0–6 完封負け**。原因は
+**炎デッキ(3エネ技依存)が2エネで止まりブリック**＋**相手がバリアント構築で探索の隠れ情報
+復元が破綻→弱いフォールバック**だった。そこで:
+- **2エネ主体**（Iron Boulder 170/{P}{C}, Mesprit 160/{P}{P}）で**確実に立ち上がる**＝ブリックしない
+- **相手デッキ復元に非依存の純ルールベース**＝相手が何の構築でも挙動が安定（バリアント耐性）
 
-## 選択したモデル: meta_search（アーキタイプ検知型 探索）
-理由: 現環境が Archaludon（ブリジュラス）主体という前提で、実測が最も強い。
-相手盤面から buddy/Crustle/Archaludon を判定 → 該当既知デッキを仮定して `search_begin`
-1手読み探索 → 未知/失敗は軽量ヒューリスティックにフォールバック。
-
-### 実測（自作ガントレット・先後入替、CrustleはN=120）
+### 実測（自己完結・先後入替、N=60〜80）
 | 相手 | 勝率 |
 |---|---|
-| Buddy（メガルカリオ）| 0.725 |
-| Archaludon（現環境）| 0.525 |
-| Fire | 0.500 |
-| Crustle（イワパレス）| 0.375 [0.288,0.462] |
-| Psychic（未検知→フォールバック）| 0.275 |
-| **総合** | **0.480** |
+| Buddy（メガルカリオ）| 0.66〜0.74 |
+| Archaludon（現環境）| 0.40 |
+| Crustle（イワパレス）| 0.03 |
 
-速度: 検知時 ~1.15s/game（1手読み）、未検知 ~0.04s/game。
+## 残リスク・限界（正直に）
+- **Archaludon には超で弱点を突けず不利（0.40）**。ただし前提出のように0–6で機能停止はせず、
+  ちゃんと殴り合って競る（ブリック回避が最優先の目的）。
+- **Crustle には弱い（0.03）**。回復壁は構造的天敵。
+- ガントレット相手（buddy/simple_bot）は実ラダーの強豪より弱い。実測値は上振れ気味に見ておく。
 
-## 残リスク・限界
-- **Crustle は 0.375 が上限**（回復壁は構造的天敵。「0.56」は高分散ノイズ、真値0.375）。
-- **未検知の相手ではフォールバックが弱め**（psychic 0.275）。ラダー主流が環境デッキ前提で最適。
-  非メタが多いと安定枠 `fire_single`（総合0.383/vs Buddy0.667）の方が堅い場面あり。
-- 探索は 1手読み（速度と強さのトレードオフ）。
-
-## 代替（安定枠・必要なら別提出に）
-`fire_single/main.py`（`fire_single.tar.gz`）: 純ヒューリスティックで未知相手にも挙動が安定。
-1日5提出可・最新2提出が集計対象なので、meta_search と併用も可能。
+## 代替案（必要なら別提出枠に）
+- `fire_single/main.py`: 炎単サイド。Archaludon 0.43 と超より良い（弱点を突ける）が、
+  3エネ技を含むためブリック耐性は champion に劣る。1日5提出・最新2提出集計なので併用も可。
 
 ## Human Gate
-実提出（アップロード）は人間の操作事項。`dist/submission.py` を Kaggle にアップロードすれば提出完了。
+実提出（アップロード）は人間の操作事項。`dist/submission.py` を Kaggle にアップすれば提出完了。

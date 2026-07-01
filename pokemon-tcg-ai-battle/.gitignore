@@ -25,3 +25,4 @@ __pycache__/
 # CABT 競技エンジン一式（競技規約に従い再配布しない。各自が配置する）
 engine/
 !submissions/meta_search_agent.py
+!submissions/psy_champion_agent.py
