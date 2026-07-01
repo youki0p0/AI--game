@@ -64,7 +64,9 @@ def build_contestant(name: str, opp_deck: list[int] | None = None
                                               attacker_priority=[663, 1027, 358, 490],
                                               min_attack_dmg=150)), list(d))
         from .deck_battle import make_deck_agent
-        return ((lambda: make_deck_agent(d, list(opp_deck), n_turns=1, rollout_budget=40)), list(d))
+        from .fire_eval import fire_slayer_eval
+        return ((lambda: make_deck_agent(d, list(opp_deck), eval_fn=fire_slayer_eval,
+                                         n_turns=1, rollout_budget=40)), list(d))
     # 汎用: DECKS の型デッキ + generic_pilot
     from .decks import DECKS
     from .generic_pilot import make_generic_pilot
