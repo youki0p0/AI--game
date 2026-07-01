@@ -73,10 +73,11 @@ DECKS["fire_single"] = build_deck(
 # ヒーローマント剥ぎ後の Crustle(150) はもちろん素の 250 でも OHKO。単サイドでサイドレース有利。
 # 3エネ技の組成が要るため *探索型パイロット* 運用前提(ヒューリスティックでは組成不能)。
 DECKS["fire_slayer"] = (
-    [663] * 4 + [358] * 4 + [1027] * 4 + [490] * 4          # Volcanion/Ogerpon/Turtonator/Victini (16)
+    [663] * 4 + [358] * 4 + [1027] * 4 + [318] * 4          # Volcanion/Ogerpon/Turtonator/Ho-Oh (16)
     + [1192] * 4 + [1224] * 4 + [1213] * 2 + [1152] * 4     # Carmine/Cheren/Judge/PokéPad
     + [1102] * 4 + [1086] * 4 + [1123] * 2 + [1182] * 3     # DuskBall/BuddyPoffin/Switch/Boss
     + [1246] * 3                                            # Jamming Tower (strip Hero's Cape)
     + [2] * 14                                              # Fire energy
 )
+# 注: Ho-Oh(318, 130HP)は Victini(80HP,ベンチ5体要求)より頑丈で対Crustle 0.375->0.425。
 assert len(DECKS["fire_slayer"]) == 60, len(DECKS["fire_slayer"])
