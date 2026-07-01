@@ -29,6 +29,7 @@ SC_PLACEMENT = {1, 2, 3, 4, 5, 6}
 AREA_ACTIVE, AREA_BENCH = 4, 5
 
 PHANTOM_DIVE = 154       # 本命の攻撃
+SHADOW_BIND = 172        # ヨノワールの技: 150＋逃げ縛り(非exなので壁のex技無効を貫通)
 DRAGAPULT_EX = 121
 DRAKLOAK = 120
 DREEPY = 119
@@ -82,9 +83,19 @@ def _eff(attack_id, atk_type, defender) -> int:
     return d
 
 
-def make_dragapult_pilot(go_first: bool = True):
+def make_dragapult_pilot(go_first: bool = True, primary_attacker: int | None = None,
+                         shadow_bind: bool = False):
+    """primary_attacker: エネ/配置を集中させるアタッカーの cardId（既定=ドラパルト ex）。
+    shadow_bind: True なら ヨノワール「影縛り」[172] をファントムダイブより優先し、
+      壁(イワパレス等)相手にヨノワールをアタッカーとして運用する。"""
+    cfg = {
+        "go_first": go_first,
+        "primary": primary_attacker or DRAGAPULT_EX,
+        "shadow_bind": shadow_bind,
+    }
+
     def piloted(obs: dict) -> list[int]:
-        return _impl(obs, go_first)
+        return _impl(obs, cfg)
     return piloted
 
 
@@ -116,7 +127,13 @@ def _prize_val(cd) -> int:
     return 1
 
 
-def _impl(obs: dict, go_first: bool) -> list[int]:
+def _impl(obs: dict, cfg) -> list[int]:
+    # 後方互換: bool を渡された場合は go_first として解釈
+    if isinstance(cfg, bool):
+        cfg = {"go_first": cfg, "primary": DRAGAPULT_EX, "shadow_bind": False}
+    go_first = cfg.get("go_first", True)
+    primary = cfg.get("primary", DRAGAPULT_EX)
+    shadow_bind = cfg.get("shadow_bind", False)
     from .dragapult_deck import DRAGAPULT_DECK
     sel = obs.get("select")
     cur = obs.get("current")
@@ -165,7 +182,9 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
         for i, o in enumerate(options):
             aid = _g(o, "attackId")
             s = float(_eff(aid, atk_type, opp_active))
-            if aid == PHANTOM_DIVE:
+            if shadow_bind and aid == SHADOW_BIND:
+                s += 5000  # 壁相手はヨノワール影縛りを最優先(ex技無効を貫通)
+            elif aid == PHANTOM_DIVE:
                 s += 1000  # 本命
             if s > best_s:
                 best_s, best_i = s, i
@@ -195,12 +214,12 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
                     cid = _g(hand[idx], "id")
                 s = 8800 + EVOLVE_PRIORITY.get(cid, 0)
             elif t == T_ATTACH:
-                # エネはアタッカーへ。ドラパルト ex(121) 最優先、次いでアクティブ、
-                # 次いでマシマシラ(112: 悪エネで特性起動)。
+                # エネは primary アタッカー(既定=ドラパルト ex, 壁相手=ヨノワール)へ集中。
+                # 次いでアクティブ、次いでマシマシラ(112: 悪エネで特性起動)。
                 tgt = _my_inplay(players, me, _g(o, "inPlayArea"), _g(o, "inPlayIndex"))
                 tid = _g(tgt, "id")
                 s = 8000
-                if tid == DRAGAPULT_EX:
+                if tid == primary:
                     s = 8600
                 elif _g(o, "inPlayArea") == AREA_ACTIVE:
                     s = 8300
@@ -229,16 +248,25 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
                 oh = float(_g(opp_active, "hp", 0) or 0)
                 aid = _g(o, "attackId")
                 ko = oh > 0 and d >= oh
-                # ファントムダイブ最優先。他の技も、盤面にプレッシャーをかけるため
-                # 撃てるなら撃つ（チップ攻撃を止めると盤面を control されて負ける）。
-                if aid == PHANTOM_DIVE:
-                    s = 10500 + d + (50000 if ko else 0)
+                # 壁モード: 影縛り(150,逃げ縛り,非ex貫通)を最優先。ファントムダイブは
+                # ex技なので壁(イワパレス)には無効化される＝この局面では選ばない。
+                if shadow_bind and aid == SHADOW_BIND:
+                    s = 11000 + d + (50000 if ko else 0)
+                elif aid == PHANTOM_DIVE:
+                    s = (2000 if shadow_bind else 10500) + d + (50000 if ko and not shadow_bind else 0)
                 elif d >= 60 or ko:
                     s = 9000 + d + (50000 if ko else 0)
                 else:
                     s = 300
             elif t == T_RETREAT:
                 s = 1500
+                # 壁モード: ベンチに 2エネ以上の primary(ヨノワール)が居て、かつ現アクティブが
+                # primary でないなら、後退して ヨノワールを前線に上げ影縛りを撃てる形にする。
+                if shadow_bind and _g(my_active, "id") != primary:
+                    bench = _g(players[me], "bench", []) or [] if len(players) > me else []
+                    if any(_g(p, "id") == primary and len(_g(p, "energies", []) or []) >= 2
+                           for p in bench if p is not None):
+                        s = 8700  # 進化/エネ付けの次に優先して交代
             elif t == T_DISCARD:
                 s = 800
             elif t == T_END:
@@ -251,7 +279,9 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
     # 配置: 自軍はアタッカー優先／相手指定(gust)はサイド大の的
     if sctx in SC_PLACEMENT:
         targets_opp = any(_g(o, "playerIndex") == (1 - me) for o in options)
-        rank = {cid: i for i, cid in enumerate(ATTACKER_PRIORITY)}
+        # primary を最優先に並べ替え（壁モードならヨノワールを前線へ）
+        pri_list = [primary] + [c for c in ATTACKER_PRIORITY if c != primary]
+        rank = {cid: i for i, cid in enumerate(pri_list)}
 
         def keyf(i):
             cid = _g(options[i], "cardId")
@@ -326,17 +356,17 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
         return sorted(picks[:max(mc, mn)])
 
     # 自軍対象/エネルギー等
-    #   Crispin 等でエネを付ける先/自軍ポケ選択は ドラパルト ex(121) を最優先。
+    #   Crispin 等でエネを付ける先/自軍ポケ選択は primary アタッカーを最優先。
     energy_choice = pult_choice = None
     for i, o in enumerate(options):
         if _g(o, "cardId") in ENERGY_IDS and energy_choice is None:
             energy_choice = i
         # 自軍ポケモンを指す選択肢か
         oid = _g(o, "cardId")
-        if oid == DRAGAPULT_EX and pult_choice is None:
+        if oid == primary and pult_choice is None:
             pult_choice = i
         tgt = _my_inplay(players, me, _g(o, "inPlayArea"), _g(o, "inPlayIndex"))
-        if _g(tgt, "id") == DRAGAPULT_EX and pult_choice is None:
+        if _g(tgt, "id") == primary and pult_choice is None:
             pult_choice = i
     if mc <= 1:
         if pult_choice is not None:
