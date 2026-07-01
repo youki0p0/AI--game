@@ -33,3 +33,15 @@ def make_dragapult_search_pilot(opp_deck: list[int] | None = None,
         return make_dragapult_pilot(go_first=True)
     return make_deck_agent(DRAGAPULT_DECK, list(opp_deck),
                            n_turns=n_turns, rollout_budget=rollout_budget)
+
+
+def make_dragapult_planner(opp_deck: list[int] | None = None,
+                           n_turns: int = 2, rollout_budget: int = 50):
+    """(2) planning型: 壁対応評価(dragapult_eval)で探索する。ex無効壁(イワパレス)相手に
+    非exアタッカー(ヨノワール=影縛り)の組成を多ターン計画で狙う。既定より深い n_turns=2。"""
+    if opp_deck is None:
+        from .dragapult_pilot import make_dragapult_pilot
+        return make_dragapult_pilot(go_first=True)
+    from .dragapult_eval import dragapult_eval
+    return make_deck_agent(DRAGAPULT_DECK, list(opp_deck), eval_fn=dragapult_eval,
+                           n_turns=n_turns, rollout_budget=rollout_budget)
