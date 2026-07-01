@@ -6,6 +6,7 @@ submissions/*
 # 提出用のソース（自己完結エージェント）は追跡する
 !submissions/README.md
 !submissions/fire_single_agent.py
+!submissions/fire_adaptive_agent.py
 
 # モデル・チェックポイント
 *.pt
