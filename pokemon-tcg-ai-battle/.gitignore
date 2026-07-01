@@ -3,6 +3,9 @@ data/*
 !data/.gitkeep
 submissions/*
 !submissions/.gitkeep
+# 提出用のソース（自己完結エージェント）は追跡する
+!submissions/README.md
+!submissions/fire_single_agent.py
 
 # モデル・チェックポイント
 *.pt
