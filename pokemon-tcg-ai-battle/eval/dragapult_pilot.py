@@ -39,6 +39,27 @@ EVOLVE_PRIORITY = {DRAKLOAK: 300, DRAGAPULT_EX: 250, 133: 120, 132: 110}
 # 自軍アタッカー配置優先
 ATTACKER_PRIORITY = [DRAGAPULT_EX, DRAKLOAK, DREEPY, 131, 112, 140, 1071, 132, 133, 235]
 
+# デッキ→手札サーチ(TO_HAND: なかよしポフィン/ハイパーボール/ポケパッド/ニャースex特性/
+# 赤松)で優先して持ってくるカード。動画いわく「ニャースexでリーリエの決心を掴む」ほか、
+# 進化の要と初動サポートを最優先。engine は合法な対象のみ提示するので全文脈で共通に効く。
+SEARCH_PRIORITY = [
+    1227,   # リーリエの決心（大型ドロー・初動最重要）
+    1198,   # 赤松 Crispin（エネ加速）
+    120,    # ドロンチ（ドローエンジン、最優先で育てたい）
+    121,    # ドラパルト ex
+    1079,   # ふしぎなアメ
+    1182,   # ボスの指令
+    119,    # ドラメシヤ
+    131,    # ヨマワル
+    133, 132,  # ヨノワール / サマヨール
+    112, 140, 1071,  # マシマシラ / キチキギス / ニャース
+    1086, 1121, 1152,  # 各ボール
+    2, 5, 7,  # 炎/超/悪エネ
+]
+MUNKIDORI = 112
+DARK_ENERGY = 7
+SC_TO_HAND, SC_DAMAGE_COUNTER, SC_DAMAGE_COUNTER_ANY = 7, 13, 14
+
 
 def _dmg(attack_id) -> int:
     a = _attack_data(attack_id)
@@ -237,6 +258,18 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
             return (1, -float(_g(cd, "hp", 0) or 0))
         scored = sorted(range(n), key=keyf)
         return [scored[0]] if mc <= 1 else sorted(scored[:max(mc, mn)])
+
+    # デッキ→手札サーチ(TO_HAND): SEARCH_PRIORITY 順に価値の高いカードを掴む。
+    #   （ニャースex特性でリーリエの決心、ボール/赤松で進化の要や初動サポートを確保）
+    if sctx == SC_TO_HAND:
+        rank = {cid: i for i, cid in enumerate(SEARCH_PRIORITY)}
+
+        def hkey(i):
+            return rank.get(_g(options[i], "cardId"), 999)
+        order = sorted(range(n), key=hkey)
+        if mc <= 1:
+            return [order[0]]
+        return sorted(order[:max(mc, mn)])
 
     # ダメカン散布・狙撃・汎用カード選択:
     #   相手のポケモンを狙う select では「倒しやすい/価値が高い」的を選ぶ。
