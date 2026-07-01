@@ -26,3 +26,4 @@ __pycache__/
 engine/
 !submissions/meta_search_agent.py
 !submissions/psy_champion_agent.py
+!submissions/grimmsnarl_agent.py
