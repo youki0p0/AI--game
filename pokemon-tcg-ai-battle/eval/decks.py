@@ -63,3 +63,7 @@ DECKS: dict[str, list[int]] = {
 DECKS["psy_single"] = build_deck(
     # all single-prize; Munkidori(110HP,60/2) adds bulk over fragile Meloetta -> 0.70 vs buddy
     [971] * 4 + [216] * 4 + [112] * 4 + [751] * 4 + [764] * 2, "PSY", n_energy=12)
+
+# single-prize FIRE aggro: counter to Crustle (Grass, weak Fire) - all non-ex, OHKO via x2
+DECKS["fire_single"] = build_deck(
+    [490] * 4 + [663] * 4 + [318] * 4 + [1027] * 4 + [358] * 2, "FIR", n_energy=12)
