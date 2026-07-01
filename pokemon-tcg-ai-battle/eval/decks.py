@@ -58,3 +58,7 @@ DECKS: dict[str, list[int]] = {
     "colorless": build_deck(
         [249] * 4 + [304] * 4 + [337] * 4 + [1002] * 4 + [176] * 2, "PSY"),
 }
+
+# single-prize-only Psychic aggro: deny buddy easy 2-3 prize KOs (all 1-prize Pokémon)
+DECKS["psy_single"] = build_deck(
+    [971] * 4 + [216] * 4 + [764] * 4 + [765] * 4 + [751] * 2, "PSY", n_energy=12)
