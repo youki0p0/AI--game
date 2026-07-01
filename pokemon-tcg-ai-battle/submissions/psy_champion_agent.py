@@ -240,7 +240,44 @@ def _agent_impl(obs_dict: dict, configuration=None) -> list[int]:
     return sorted(chosen[:max(mc, mn)]) if chosen else first_k()
 
 
+def _safe_default(observation):
+    """例外/想定外でも *必ず合法な非空アクション* を返す最終防衛線。
+    実戦ログでは提出物が空アクションを69/136回返して自滅していた。ここで根絶する。"""
+    sel = observation.get("select") if isinstance(observation, dict) else _g(observation, "select")
+    if sel is None:
+        return list(PSY_DECK)
+    opts = _g(sel, "option", []) or []
+    n = len(opts)
+    if n == 0:
+        return []
+    mc = int(_g(sel, "maxCount", 1) or 1)
+    mn = int(_g(sel, "minCount", 0) or 0)
+    k = min(max(mc, mn if mn > 0 else 1), n)
+    return list(range(k))
+
+
 # Kaggle エントリ: 提出仕様「末尾の def が observation を受け取り action を返す」に厳密適合。
 # （agent 内に入れ子 def を持たせず、この関数をファイル末尾の唯一の最終 def にする）
 def agent(observation, configuration=None):
-    return _agent_impl(observation, configuration)
+    # 全例外を握り、常に合法な非空アクションを返す（空アクションでの自滅を防止）。
+    try:
+        out = _agent_impl(observation, configuration)
+    except Exception:
+        return _safe_default(observation)
+    # 妥当性検証: select があるのに空/不正なら安全なデフォルトへ差し替え
+    try:
+        sel = observation.get("select") if isinstance(observation, dict) else _g(observation, "select")
+        if sel is None:
+            return out if (isinstance(out, list) and len(out) == 60) else list(PSY_DECK)
+        opts = _g(sel, "option", []) or []
+        n = len(opts)
+        if n == 0:
+            return []
+        mc = int(_g(sel, "maxCount", 1) or 1)
+        mn = int(_g(sel, "minCount", 0) or 0)
+        ok = (isinstance(out, list) and len(out) >= max(1, mn) and len(out) <= mc
+              and len(set(out)) == len(out)
+              and all(isinstance(i, int) and 0 <= i < n for i in out))
+        return out if ok else _safe_default(observation)
+    except Exception:
+        return _safe_default(observation)
