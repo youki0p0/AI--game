@@ -210,44 +210,151 @@ def _eff_vs(aid, atk_type, defender) -> int:
     return dmg
 
 
+# 重み（研究版 state_eval と一致。この評価で fire_slayer は vs Crustle 0.56 を出した）
+_W = {
+    "prize_diff": 1000.0, "prize_value": 300.0, "hp_ratio": 120.0,
+    "energy_ready": 90.0, "energy_extra": 15.0, "stage2": 60.0, "stage1": 30.0, "tool": 25.0,
+    "can_ko": 250.0, "will_be_koed": 200.0, "damage_ratio": 80.0,
+    "sc_poison": 40.0, "sc_burn": 30.0, "sc_sleep": 70.0, "sc_paralyze": 70.0, "sc_confuse": 35.0,
+    "hand": 8.0, "deck": 1.5, "bench": 25.0, "total_energy": 6.0, "terminal": 100000.0,
+    "fire_energy": 45.0, "jam": 120.0,
+}
+
+
+def _prize_value(p) -> int:
+    cd = _card_data(_g(p, "id"))
+    if cd is None:
+        return 1
+    return 3 if _g(cd, "megaEx") else (2 if _g(cd, "ex") else 1)
+
+
+def _energy_req(p):
+    cd = _card_data(_g(p, "id"))
+    if cd is None:
+        return None
+    costs = [len(_g(a, "energies", []) or []) for a in
+             (_attack_data(aid) for aid in (_g(cd, "attacks", []) or [])) if a is not None]
+    return min(costs) if costs else None
+
+
+def _best_dmg(p) -> int:
+    cd = _card_data(_g(p, "id"))
+    if cd is None:
+        return 0
+    have = len(_g(p, "energies", []) or [])
+    best = 0
+    for aid in (_g(cd, "attacks", []) or []):
+        a = _attack_data(aid)
+        if a is not None and have >= len(_g(a, "energies", []) or []):
+            best = max(best, int(_g(a, "damage", 0) or 0))
+    return best
+
+
+def _eff_dmg_pk(attacker, defender) -> float:
+    dmg = float(_best_dmg(attacker))
+    if dmg <= 0 or defender is None:
+        return dmg
+    ad = _card_data(_g(attacker, "id"))
+    dd = _card_data(_g(defender, "id"))
+    if ad is None or dd is None:
+        return dmg
+    at = _g(ad, "energyType")
+    if _g(dd, "weakness") is not None and at is not None and at == _g(dd, "weakness"):
+        return dmg * 2.0
+    if _g(dd, "resistance") is not None and at is not None and at == _g(dd, "resistance"):
+        return max(0.0, dmg - 30.0)
+    return dmg
+
+
+def _pokemon_value(p) -> float:
+    if p is None:
+        return 0.0
+    v = _W["prize_value"] * _prize_value(p)
+    hp = float(_g(p, "hp", 0) or 0)
+    mx = float(_g(p, "maxHp", 0) or 0)
+    if mx > 0:
+        v += _W["hp_ratio"] * max(0.0, min(1.0, hp / mx))
+    have = len(_g(p, "energies", []) or [])
+    req = _energy_req(p)
+    if req is None:
+        v += _W["energy_extra"] * have
+    else:
+        v += _W["energy_ready"] * min(have, req) + _W["energy_extra"] * max(0, have - req)
+    cd = _card_data(_g(p, "id"))
+    if cd is not None:
+        if _g(cd, "stage2"):
+            v += _W["stage2"]
+        elif _g(cd, "stage1"):
+            v += _W["stage1"]
+    v += _W["tool"] * len(_g(p, "tools", []) or [])
+    return v
+
+
+def _sc_score(pl) -> float:
+    s = 0.0
+    for k, w in (("poisoned", "sc_poison"), ("burned", "sc_burn"), ("asleep", "sc_sleep"),
+                 ("paralyzed", "sc_paralyze"), ("confused", "sc_confuse")):
+        if _g(pl, k):
+            s += _W[w]
+    return s
+
+
+def _iter_pk(pl):
+    for area in ("active", "bench"):
+        for p in (_g(pl, area, []) or []):
+            if p is not None:
+                yield p
+
+
 def _eval(current, me) -> float:
+    """研究版 state_eval + fire_slayer_eval を忠実にインライン。"""
     if current is None:
         return 0.0
     res = _g(current, "result", -1)
     if res is not None and res != -1:
-        return 1e9 if res == me else (-1e9 if res == (1 - me) else 0.0)
+        return _W["terminal"] if res == me else (-_W["terminal"] if res == (1 - me) else 0.0)
     players = _g(current, "players", []) or []
-    if len(players) < 2:
+    if len(players) < 2 or me not in (0, 1):
         return 0.0
     mp, op = players[me], players[1 - me]
     s = 0.0
-    my_rem = len(_g(mp, "prize", []) or [])
-    op_rem = len(_g(op, "prize", []) or [])
-    s += 2000.0 * (op_rem - my_rem)
+    # サイド差（支配項）
+    s += _W["prize_diff"] * (len(_g(op, "prize", []) or []) - len(_g(mp, "prize", []) or []))
+    # マテリアル差
+    s += sum(_pokemon_value(p) for p in _iter_pk(mp)) - sum(_pokemon_value(p) for p in _iter_pk(op))
 
     def act(pl):
         a = _g(pl, "active", []) or []
         return a[0] if a else None
-    oa = act(op)
-    if oa is not None:
-        hp = float(_g(oa, "hp", 0) or 0)
-        mx = float(_g(oa, "maxHp", 0) or 0)
-        if mx > 0:
-            s += 3.0 * max(0.0, mx - hp)
-    for area in ("active", "bench"):
-        for p in (_g(mp, area, []) or []):
-            if p is None:
-                continue
-            cd = _card_data(_g(p, "id"))
-            s += 120.0
-            if cd is not None and _g(cd, "energyType") == FIRE_TYPE:
-                s += 45.0 * min(len(_g(p, "energies", []) or []), 3)
-        for p in (_g(op, area, []) or []):
-            if p is not None:
-                s -= 100.0
+    ma, oa = act(mp), act(op)
+    # 脅威/テンポ
+    if ma is not None and oa is not None:
+        d = _eff_dmg_pk(ma, oa)
+        oh = float(_g(oa, "hp", 0) or 0)
+        if oh > 0:
+            s += (_W["can_ko"] + _W["damage_ratio"]) if d >= oh else _W["damage_ratio"] * (d / oh)
+    if oa is not None and ma is not None:
+        d = _eff_dmg_pk(oa, ma)
+        mh = float(_g(ma, "hp", 0) or 0)
+        if mh > 0:
+            s -= (_W["will_be_koed"] + _W["damage_ratio"]) if d >= mh else _W["damage_ratio"] * (d / mh)
+    s -= _sc_score(mp)
+    s += _sc_score(op)
+    # 資源
+    s += _W["hand"] * (float(_g(mp, "handCount", 0) or 0) - float(_g(op, "handCount", 0) or 0))
+    s += _W["deck"] * (float(_g(mp, "deckCount", 0) or 0) - float(_g(op, "deckCount", 0) or 0))
+    s += _W["bench"] * (len(_g(mp, "bench", []) or []) - len(_g(op, "bench", []) or []))
+    my_e = sum(len(_g(p, "energies", []) or []) for p in _iter_pk(mp))
+    op_e = sum(len(_g(p, "energies", []) or []) for p in _iter_pk(op))
+    s += _W["total_energy"] * (my_e - op_e)
+    # 炎スレイヤー補正: 炎アタッカーのエネ組成 + Jamming Tower
+    for p in _iter_pk(mp):
+        cd = _card_data(_g(p, "id"))
+        if cd is not None and _g(cd, "energyType") == FIRE_TYPE:
+            s += _W["fire_energy"] * min(len(_g(p, "energies", []) or []), 3)
     for st in (_g(current, "stadium", []) or []):
         if _g(st, "id") == JAMMING_TOWER:
-            s += 120.0
+            s += _W["jam"]
             break
     return s
 
