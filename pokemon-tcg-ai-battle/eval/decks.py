@@ -67,3 +67,16 @@ DECKS["psy_single"] = build_deck(
 # single-prize FIRE aggro: counter to Crustle (Grass, weak Fire) - all non-ex, OHKO via x2
 DECKS["fire_single"] = build_deck(
     [490] * 4 + [663] * 4 + [318] * 4 + [1027] * 4 + [358] * 2, "FIR", n_energy=12)
+
+# Crustle-slayer (WEB調査ベース): 全基本の炎非ex + Jamming Tower(1246)でヒーローマント剥がし
+# + Hearthflame Ogerpon(358) Fire Kagura でエネ加速。Volcanion Backfire 130->弱点x2=260 で
+# ヒーローマント剥ぎ後の Crustle(150) はもちろん素の 250 でも OHKO。単サイドでサイドレース有利。
+# 3エネ技の組成が要るため *探索型パイロット* 運用前提(ヒューリスティックでは組成不能)。
+DECKS["fire_slayer"] = (
+    [663] * 4 + [358] * 4 + [1027] * 4 + [490] * 4          # Volcanion/Ogerpon/Turtonator/Victini (16)
+    + [1192] * 4 + [1224] * 4 + [1213] * 2 + [1152] * 4     # Carmine/Cheren/Judge/PokéPad
+    + [1102] * 4 + [1086] * 4 + [1123] * 2 + [1182] * 3     # DuskBall/BuddyPoffin/Switch/Boss
+    + [1246] * 3                                            # Jamming Tower (strip Hero's Cape)
+    + [2] * 14                                              # Fire energy
+)
+assert len(DECKS["fire_slayer"]) == 60, len(DECKS["fire_slayer"])

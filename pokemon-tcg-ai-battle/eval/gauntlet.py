@@ -54,6 +54,17 @@ def build_contestant(name: str, opp_deck: list[int] | None = None
         from .dragapult_deck import DRAGAPULT_DECK
         from .dragapult_search import make_dragapult_search_pilot
         return ((lambda: make_dragapult_search_pilot(opp_deck)), list(DRAGAPULT_DECK))
+    if name == "fire_slayer":
+        # WEB調査ベースの対Crustle炎デッキ。探索型で3エネOHKOを組む(opp_deck既知時)。
+        from .decks import DECKS
+        d = DECKS["fire_slayer"]
+        if opp_deck is None:
+            from .typed_pilot import make_typed_pilot
+            return ((lambda: make_typed_pilot(d, energy_id=2,
+                                              attacker_priority=[663, 1027, 358, 490],
+                                              min_attack_dmg=150)), list(d))
+        from .deck_battle import make_deck_agent
+        return ((lambda: make_deck_agent(d, list(opp_deck), n_turns=1, rollout_budget=40)), list(d))
     # 汎用: DECKS の型デッキ + generic_pilot
     from .decks import DECKS
     from .generic_pilot import make_generic_pilot
