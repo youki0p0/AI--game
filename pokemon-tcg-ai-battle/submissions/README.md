@@ -1,24 +1,31 @@
 # 提出（submissions）
 
-## fire_single_agent.py — Fire 単サイド（現行の提出候補）
+## ★ 提出ファイル: `fire_single_agent.py` — Fire 単サイド
 
-自己完結の単一ファイルエージェント。`cg.api` 以外を import せず、Kaggle サンドボックスで
-そのまま動く。`agent(obs_dict) -> list[int]` を公開し、デッキ選択フェーズ
-（`select is None`）では 60 枚の cardId 配列を返す。
+自己完結の単一ファイルエージェント。`cg.api` 以外を import せず、**相手デッキに非依存**で
+Kaggle サンドボックスでそのまま動く。`agent(obs_dict) -> list[int]` を公開し、デッキ選択
+フェーズ（`select is None`）では 60 枚の cardId 配列を返す。
 
 ### デッキ
 Fire 単サイド（全非ex・弱点炎アグロ）。18 Pokémon / 30 Trainer / 12 Energy。
 - アタッカー: Victini(240) / Volcanion(260) / Ho-Oh / Turtonator / Ogerpon（数値は弱点×2打点）
 - 安定トレーナー30枚（engine 安全カードのみ）＋ 基本炎エネルギー12
 
-### 実測勝率（先後入替）
+### 実測勝率（自己完結ヒューリスティック・先後入替・各N=60）
 | 相手 | 勝率 |
 |---|---|
-| Buddy（サンプル/Mega Lucario ex）| 0.66 |
-| Archaludon（現環境/ブリジュラスex）| 0.515（互角）|
-| Crustle（Day-1 #1 壁）| 0.015（苦手）|
+| Buddy（サンプル/Mega Lucario ex）| **0.667**（当初ゴール ≥0.65 達成）|
+| Archaludon（現環境/ブリジュラスex）| 0.433 |
+| Psychic（自作単サイド）| 0.400 |
+| Crustle（Day-1 #1 壁）| 0.033（苦手）|
+| **総合** | **0.383** |
 
-詳細は `../docs/meta-crustle-archaludon.md`。
+### なぜこれを提出するか（重要）
+より強い探索型 **fire_slayer（総合0.73・vs Crustle 0.56）** は、`search_begin` の隠れ情報
+復元に **相手デッキ** を必要とする。実戦では相手デッキが不明で復元できず、提出環境では
+機能しない（ルール型にフォールバック）。したがって提出は「**相手デッキ非依存で動く
+自己完結ヒューリスティック**」である本ファイルが最適。探索型は相手デッキ既知の
+解析・チューニング専用（`../docs/` 参照）。
 
 ### 提出方法（Kaggle CABT）
 `fire_single_agent.py` をそのまま提出物のエントリにする。`agent` 関数が呼ばれる。
@@ -39,3 +46,15 @@ w = sum(1 for g in range(50) if play_game(sub.agent, load_buddy_agent(), deck0=s
 print("submission vs buddy (先手50戦):", w/50)
 PY
 ```
+
+---
+
+## 参考: 研究レベルのより強いエージェント（提出不可・相手デッキ既知が前提）
+
+| エージェント | 総合 | vs Crustle | 備考 |
+|---|---|---|---|
+| **fire_slayer**（探索型＋fire_slayer_eval）| **0.73** | **0.56** | WEB調査ベースの対壁デッキ。天敵イワパレスに勝ち越し |
+| dragapult_search（探索型）| 0.52 | 0.03 | 実メタT1ドラパルトex。アグロに圧勝、壁は苦手 |
+
+いずれも `eval/gauntlet.py` で相手デッキを渡して計測する研究用。実戦提出では相手デッキが
+未知のため使えない。詳細は `docs/crustle-counter-research.md`, `docs/dragapult-*` を参照。

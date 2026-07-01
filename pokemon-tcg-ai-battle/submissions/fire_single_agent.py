@@ -1,13 +1,23 @@
-"""PTCG AI Battle 提出エージェント: Fire 単サイド（全非ex・弱点炎アグロ）。
+"""PTCG AI Battle 提出エージェント（本命）: Fire 単サイド（全非ex・弱点炎アグロ）。
 
-方針（docs/meta-crustle-archaludon.md 参照）:
+★これが提出ファイル。自己完結（cg.api 以外を import しない）で、相手デッキ非依存。
+  Kaggle サンドボックスでそのまま動く単一ファイル。observation(dict) を受け取り、
+  select.option のインデックス配列(list[int]) を返す。select が None（デッキ選択
+  フェーズ）のときは 60 枚の cardId 配列を返す。
+
+方針:
   - 全アタッカーが非ex＝KOされても相手に1サイドしか渡さない（サイドレース有利）。
-  - 相手の弱点(炎)を突いて×2ダメージでKO。Archaludon ex(鋼300HP)/Crustle(草)/一般exに刺さる。
-  - 実測: vs Buddy 0.66・vs Archaludon(現環境) 0.515（互角）。
+  - 相手の弱点(炎)を突いて×2ダメージでKO。Archaludon ex(鋼300HP)/一般exに刺さる。
 
-自己完結（cg.api 以外を import しない）。Kaggle サンドボックスでそのまま動く単一ファイル。
-observation(dict) を受け取り、select.option のインデックス配列(list[int]) を返す。
-select が None（デッキ選択フェーズ）のときは 60 枚の cardId 配列を返す。
+実測（自己完結ヒューリスティック・先後入替・各N=60）:
+  vs Buddy 0.667 / vs Archaludon(現環境) 0.433 / vs Psychic 0.400 / vs Crustle 0.033
+  → 当初ゴール「vs Buddy ≥0.65」を達成。実環境Archaludon相手にも競争力のある万能型。
+
+なぜ探索型(fire_slayer, 総合0.73)ではなくこれを提出するか:
+  探索型パイロットは search_begin の隠れ情報復元に *相手デッキ* を必要とする。実戦では
+  相手デッキは不明なので復元できず＝提出環境では機能しない（ルール型にフォールバック）。
+  従って提出は「相手デッキ非依存で動く自己完結ヒューリスティック」である本ファイルが最適。
+  探索型 fire_slayer は相手デッキ既知の解析・チューニング用（docs/ 参照）。
 """
 from __future__ import annotations
 
