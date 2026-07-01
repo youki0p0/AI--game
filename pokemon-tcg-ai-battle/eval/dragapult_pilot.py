@@ -34,8 +34,10 @@ DRAKLOAK = 120
 DREEPY = 119
 ENERGY_IDS = {2, 5, 7}   # 炎/超/悪
 
-# 進化の優先度（先に育てたい順）: ドロンチ(ドロー) > ドラパルト(攻撃) > ヨノワール系
-EVOLVE_PRIORITY = {DRAKLOAK: 300, DRAGAPULT_EX: 250, 133: 120, 132: 110}
+# 進化の優先度（先に育てたい順）: ドロンチ(ドロー) > ドラパルト(攻撃) > ヨノワール系。
+# ヨノワール(133)は「カースドボム」で壁(イワパレス等)をex技無効を貫通して削る勝ち筋
+# なので、サマヨール(132/5個)より本命ヨノワール(133/13個)を高めに置く。
+EVOLVE_PRIORITY = {DRAKLOAK: 300, DRAGAPULT_EX: 250, 133: 230, 132: 160}
 # 自軍アタッカー配置優先
 ATTACKER_PRIORITY = [DRAGAPULT_EX, DRAKLOAK, DREEPY, 131, 112, 140, 1071, 132, 133, 235]
 
@@ -179,7 +181,10 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
             t = _g(o, "type")
             s = 0.0
             if t == T_ABILITY:
-                s = 9500  # ドロー(ていさつしれい)/ダメカン系は最優先
+                # 注: カースドボム(ヨノワール/サマヨール)は「使うと自分が気絶(相手にサイド1枚)」
+                # の高コスト特性。撃つべきかの判断は盤面シミュレーションが必要でルール型では
+                # 最適化しきれない → 探索型(dragapult_search)に委ねる。ここは一律高評価に留める。
+                s = 9500  # ていさつしれい(ドロー)等を最優先
             elif t == T_EVOLVE:
                 pk = None
                 cid = None
@@ -302,8 +307,13 @@ def _impl(obs: dict, go_first: bool) -> list[int]:
                 or _g(o, "inPlayArea") in (AREA_ACTIVE, AREA_BENCH) and _g(o, "playerIndex") == (1 - me)]
     if opp_opts:
         order = sorted(opp_opts, key=opp_target_key)
-        # ダメカン散布は複数個置けることがある: 倒しやすい順に詰める
+        # 単体指定（カースドボム/クルーエルアロー/アドレナブレイン等）は相手アクティブに
+        # 集中させて壁を割る（削り分散を防ぐ）。散布(複数)は倒しやすい順に詰める。
         if mc <= 1:
+            for i in opp_opts:
+                o = options[i]
+                if _g(o, "area") == AREA_ACTIVE or _g(o, "inPlayArea") == AREA_ACTIVE:
+                    return [i]
             return [order[0]]
         picks = order[:mc]
         # minCount 未満なら他の合法手で埋める
