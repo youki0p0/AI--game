@@ -61,4 +61,5 @@ DECKS: dict[str, list[int]] = {
 
 # single-prize-only Psychic aggro: deny buddy easy 2-3 prize KOs (all 1-prize Pokémon)
 DECKS["psy_single"] = build_deck(
-    [971] * 4 + [216] * 4 + [764] * 4 + [765] * 4 + [751] * 2, "PSY", n_energy=12)
+    # all single-prize; Munkidori(110HP,60/2) adds bulk over fragile Meloetta -> 0.70 vs buddy
+    [971] * 4 + [216] * 4 + [112] * 4 + [751] * 4 + [764] * 2, "PSY", n_energy=12)
