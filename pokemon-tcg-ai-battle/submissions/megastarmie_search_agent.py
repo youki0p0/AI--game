@@ -1,4 +1,9 @@
-"""PTCG AI Battle 提出エージェント: Archaludon ex（鋼 / ブリジュラス）＋ 探索パイロット。
+"""[2モデル分散のモデル2] Archaludon(モデル1)の穴を埋める補完デッキ。
+Mega Starmie ex(水・テンポ)。探索パイロット(深さ3)は archaludon_search_agent と共通ロジックで、
+デッキのみ差し替え。補完性: 探索版の実測で vs Crustle 0.67(Archaludon 0.29の穴を埋める)、
+Archaludon+MegaStarmie ペアの下限保証 0.62(どの相手が来ても良い方が有利)。
+
+PTCG AI Battle 提出エージェント(モデル2/ポートフォリオ): Mega Starmie ex（水）＋ 探索パイロット。
 
 デッキは実ラダー最頻の Archaludon ex（archaludon_agent.py と同一）。操縦を「固定スコアの
 simple_bot」から **3手読み探索** に置き換えたもの。各決定で *全ての合法オプション* を
@@ -15,7 +20,7 @@ simple_bot」から **3手読み探索** に置き換えたもの。各決定で
   全マッチ改善: vs Grimmsnarl 0.57→0.80 / vs Alakazam 0.65→0.72 / vs MegaStarmie 0.68→0.70。
   提出ファイル直接検証(深さ3,計90戦)でも OVERALL 0.711・例外0。合計270戦でブリック/例外なし。
 
-隠れ情報は自デッキ(ARCH_DECK)から再構成。相手デッキ未知でも 奇数深さ(自ターンで評価)は
+隠れ情報は自デッキ(STARMIE_DECK)から再構成。相手デッキ未知でも 奇数深さ(自ターンで評価)は
 自盤面の評価が主なので頑健。全て単一ファイル・cg.api のみ依存・相手デッキ非依存。
 
 ★ 提出安全化: 末尾の唯一の最終 def が agent(observation, ...)。探索が失敗しても全例外を握り、
@@ -30,12 +35,12 @@ from collections import Counter
 from typing import Any
 
 # --- Archaludon ex デッキ（archaludon_agent.py と同一）-----------------------------
-ARCH_DECK = (
-    [169] * 4 + [190] * 4 + [666] * 4 + [1244] * 4 + [8] * 13
-    + [1152] * 4 + [1121] * 4 + [1122] * 4 + [1097] * 4 + [1197] * 3
-    + [1147] * 2 + [1159] * 1 + [1182] * 1 + [1185] * 4 + [1227] * 4
+STARMIE_DECK = (
+    [3]*9 + [17]*4 + [666]*4 + [1030]*3 + [1031]*3 + [1086]*4 + [1097]*2
+    + [1120]*4 + [1121]*1 + [1122]*4 + [1145]*4 + [1159]*1 + [1182]*1
+    + [1189]*4 + [1223]*2 + [1225]*2 + [1227]*4 + [1229]*4
 )
-assert len(ARCH_DECK) == 60, len(ARCH_DECK)
+assert len(STARMIE_DECK) == 60, len(STARMIE_DECK)
 
 # 探索パラメータ
 N_TURNS = 3            # 3手読み(自分→相手→自分)。奇数深さ=自ターンで評価=空想相手誤差に頑健。
@@ -254,7 +259,7 @@ def state_eval(current, me):
 
 
 # ---------------------------------------------------------------------------
-# 隠れ情報の再構成（自デッキ=ARCH_DECK から）
+# 隠れ情報の再構成（自デッキ=STARMIE_DECK から）
 # ---------------------------------------------------------------------------
 def _cards_in_play(pk):
     ids = [pk["id"]] if isinstance(pk, dict) else [_g(pk, "id")]
@@ -287,7 +292,7 @@ def _reconstruct(obs):
     players = _g(cur, "players", []) or []
     if len(players) < 2:
         return None
-    full = Counter(ARCH_DECK)
+    full = Counter(STARMIE_DECK)
     mp, op = players[me], players[opp]
     my_unknown = list((full - _visible_used(mp)).elements())
     op_unknown = list((full - _visible_used(op)).elements())
@@ -326,7 +331,7 @@ def _fallback(obs):
     """探索不能時の安全手（簡易 setup-then-attack 相当）。空アクションにしない。"""
     sel = obs.get("select") if isinstance(obs, dict) else _g(obs, "select")
     if sel is None:
-        return list(ARCH_DECK)
+        return list(STARMIE_DECK)
     opts = _g(sel, "option", []) or []
     n = len(opts)
     if n == 0:
@@ -339,7 +344,7 @@ def _fallback(obs):
 def _search_impl(obs):
     sel = obs.get("select") if isinstance(obs, dict) else _g(obs, "select")
     if sel is None:
-        return list(ARCH_DECK)  # デッキ選択フェーズ
+        return list(STARMIE_DECK)  # デッキ選択フェーズ
     options = _g(sel, "option", []) or []
     n = len(options)
     if n == 0:
@@ -474,7 +479,7 @@ def _safe_default(observation):
     """絶対にブリックしない保険手。空アクション自滅を根絶する。"""
     sel = observation.get("select") if isinstance(observation, dict) else _g(observation, "select")
     if sel is None:
-        return list(ARCH_DECK)
+        return list(STARMIE_DECK)
     opts = _g(sel, "option", []) or []
     n = len(opts)
     if n == 0:
@@ -493,7 +498,7 @@ def agent(observation, configuration=None):
     try:
         sel = observation.get("select") if isinstance(observation, dict) else _g(observation, "select")
         if sel is None:
-            return out if (isinstance(out, list) and len(out) == 60) else list(ARCH_DECK)
+            return out if (isinstance(out, list) and len(out) == 60) else list(STARMIE_DECK)
         opts = _g(sel, "option", []) or []
         n = len(opts)
         if n == 0:
