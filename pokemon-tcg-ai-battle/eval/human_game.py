@@ -171,37 +171,89 @@ def main():
     # reset IPC files
     open(MOVE_FILE, "w").close()
 
+    import json as _json
+    from . import board_html as BH
+    BOARD_HTML = "/tmp/hvg_board.html"
+    LOG_JSONL = "/tmp/hvg_log.jsonl"
+    open(LOG_JSONL, "w").close()
+    gamelog = []
+
+    def _prizes(o):
+        cur = o.get("current") or {}; ps = cur.get("players") or []
+        return [len((ps[i] or {}).get("prize") or []) for i in range(len(ps))] if ps else [0, 0]
+
+    def _choice_note(o, idxs, who):
+        """攻撃など目立つ手をログ文字列にする。"""
+        sel = o.get("select") or {}; opts = sel.get("option") or []
+        for i in idxs:
+            if 0 <= i < len(opts) and opts[i].get("type") == 13:
+                a = atks.get(opts[i].get("attackId"))
+                nm = getattr(a, "name", "こうげき") if a else "こうげき"
+                dm = getattr(a, "damage", 0) if a else 0
+                return f"{who}：こうげき「{nm}」(ダメ{dm})"
+        return None
+
+    def _write_board(data):
+        with open(BOARD_HTML, "w") as f:
+            f.write(BH.render_html(data))
+
     obs, _ = game.battle_start(list(human_deck), list(opp_deck))
     seq = 0
+    prev_prizes = _prizes(obs)
     try:
         while True:
             cur = obs.get("current")
+            # サイド取得(KO)をログ
+            pz = _prizes(obs)
+            if pz != prev_prizes:
+                for i in (0, 1):
+                    if pz[i] < prev_prizes[i]:
+                        who = "あなた" if i == 0 else "AI"
+                        gamelog.append(f"⚔ {who} がサイドを取った（残り{pz[i]}）")
+                prev_prizes = pz
             if cur is not None and cur.get("result", -1) != -1:
                 res = cur.get("result")
-                who = "あなたの勝ち！" if res == 0 else ("相手(AI)の勝ち…" if res == 1 else "引き分け")
-                _write_state(seq, True, f"===== 対戦終了: {who} =====", winner=res)
+                data = BH.board_data(cards, atks, obs, seq, gamelog)
+                data["over"] = True; data["winner"] = res
+                _write_board(data)
+                _write_state(seq, True, "対戦終了", winner=res)
+                with open(LOG_JSONL, "a") as f:
+                    f.write(_json.dumps({"event": "end", "winner": res, "log": gamelog}, ensure_ascii=False) + "\n")
                 return
             serial = lib.GetBattleData(Battle.battle_ptr)
             acting = int(serial.selectPlayer)
             if acting == 1:  # 相手=AI
-                obs = game.battle_select(opp_agent(obs))
+                act = opp_agent(obs)
+                note = _choice_note(obs, act if isinstance(act, list) else [], "AI")
+                if note:
+                    gamelog.append(note)
+                obs = game.battle_select(act)
                 continue
             # 人間(P0)の手番
             sel = obs.get("select")
             if sel is None:
-                # デッキ選択フェーズ等: 人間側も自動で自デッキ
-                obs = game.battle_select(list(human_deck))
-                continue
+                obs = game.battle_select(list(human_deck)); continue
             opts0 = sel.get("option") or []
             if len(opts0) == 0:
                 obs = game.battle_select([]); continue
-            # 強制手(選択肢1つ)は自動で進めて手間を減らす
             if len(opts0) == 1 and int(sel.get("maxCount", 1) or 1) >= 1:
                 obs = game.battle_select([0]); continue
             seq += 1
-            text, nopt, mc, mn = render(cards, atks, obs, seq)
-            _write_state(seq, False, text, nopt, mc, mn)
-            idxs = _wait_move(seq, nopt, mc, mn)
+            data = BH.board_data(cards, atks, obs, seq, gamelog)
+            _write_board(data)
+            _write_state(seq, False, "your_turn", len(opts0),
+                         data["maxCount"], data["minCount"])
+            with open(LOG_JSONL, "a") as f:
+                f.write(_json.dumps({"event": "your_decision", "seq": seq, "board": data}, ensure_ascii=False) + "\n")
+            idxs = _wait_move(seq, len(opts0), data["maxCount"], data["minCount"])
+            note = _choice_note(obs, idxs, "あなた")
+            if note:
+                gamelog.append(note)
+            else:
+                lab = data["options"][idxs[0]]["label"] if (idxs and idxs[0] < len(data["options"])) else str(idxs)
+                gamelog.append(f"あなた：{lab}")
+            with open(LOG_JSONL, "a") as f:
+                f.write(_json.dumps({"event": "your_move", "seq": seq, "chosen": idxs}, ensure_ascii=False) + "\n")
             obs = game.battle_select(idxs)
     finally:
         try:
