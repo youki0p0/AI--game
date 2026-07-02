@@ -66,6 +66,25 @@ unzip -o "data/*.zip" -d data/
 3. ローカルで `kaggle-environments` を使って自己対戦させ検証
 4. `main.py` を提出（Notebook 経由 or CLI）。1日5回まで → 上位2提出が残る
 
+## 人間 vs AI で遊ぶ（`play_vs_human`）
+
+これまで育てたエージェント（`champion` / `buddy` / `submissions/*`）を相手に、
+ターミナルから自分で手を選んで対戦できる。盤面・選択肢は日本語ラベルで表示され、
+番号入力（カンマ区切りで複数選択可）で操作する。`q` でいつでも投了できる。
+
+```bash
+cd pokemon-tcg-ai-battle
+python -m eval.play_vs_human --list                       # 対戦相手一覧を表示
+python -m eval.play_vs_human                               # champion 相手（デフォルト）
+python -m eval.play_vs_human --opponent buddy
+python -m eval.play_vs_human --opponent grimmsnarl --human-deck psy_single
+python -m eval.play_vs_human --opponent submissions/fire_single_agent.py
+```
+
+要 `engine/`（CABT本体。競技規約により非再配布のため `.gitignore` 済み・各自配置）。
+未配置の場合はエラーメッセージで案内される。エンジン非依存の部分（盤面表示・選択肢
+表示・入力パース・対戦相手解決）は `tests/test_play_vs_human.py` でテスト済み。
+
 ## メモ
 
 - observation/action の正確なスキーマはデータ取得・CABTドキュメント確認後に確定する
