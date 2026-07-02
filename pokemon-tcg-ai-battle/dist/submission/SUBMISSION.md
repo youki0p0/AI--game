@@ -18,14 +18,8 @@
 フィールド0.2〜0.3で、トップ(探索型・2.4s/決定)との差は操縦の計画力。レートを最優先するなら
 `submission2_megastarmie.py` を、Dragapultを使う意志を優先するなら `submission2.py` を。
 
----|---|---|---|
-| **モデル1** | `dist/submission.py` | Archaludon ex（鋼・耐久ミッドレンジ）＋探索(深さ3) | 頻出メタ全般に強い主力 |
-| **モデル2** | `dist/submission2.py` | Mega Starmie ex（水・テンポ）＋探索(深さ3) | Archaludonの穴(Crustle壁)を埋める補完 |
-
-**補完性（探索パイロット実測）**: 各相手で"良い方"を採れる下限保証 **0.62**（＝どの相手が来ても最低1モデルが有利）。
-- Archaludon: vsGrimm 0.71 / vsAlakazam 0.62 / vsMegaStar 0.67 / vsDragapult 1.00 / **vsCrustle 0.29**
-- MegaStarmie: vsDragapult 0.96 / **vsCrustle 0.67〜0.92**（Archaludonの唯一の穴=壁を埋める。水の非ex打点がex無効壁を貫通）
-- 2つは戦術が異なる（鋼・盤面グラインド vs 水・テンポ）ので、メタが回っても両取りしにくい＝分散が効く。
+**MegaStarmie（代替）の補完性データ**: vsDragapult 0.96 / vsCrustle 0.67〜0.92（Archaludonの唯一の穴=壁を
+水の非ex打点で貫通）。Archaludon+MegaStarmie のペア下限保証 0.62。
 
 → **`dist/submission.py` と `dist/submission2.py` の両方をアップロード**（最新2つが有効カウント）。
 
