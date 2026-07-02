@@ -25,10 +25,15 @@ assert len(DRAG_DECK) == 60
 DRAGAPULT, DRAKLOAK, DREEPY, BUDEW = 121, 120, 119, 235
 PHANTOM_DIVE_NAME = "Phantom Dive"
 
-PLAY_PRIO = {1079: 8800, 1086: 8600, 119: 8500, 1121: 8400, 1152: 8300, 1210: 8200,
-             1120: 8000, 1198: 7800, 1097: 7600, 1071: 7500, 140: 7400, 184: 7300,
-             235: 7200, 1080: 7000, 1256: 6900, 1156: 6500, 1182: 5600, 1227: 7100}
+# v3: 混同行列から抽出した手順 — コイン/情報系(Hammer/Pad)を最初、進化→特性、Lillie's重用
+PLAY_PRIO = {1120: 9800, 1152: 9700, 1079: 9550, 1256: 9450,
+             1121: 8450, 119: 8380, 1086: 8360, 1198: 8340, 1210: 8320, 1097: 8300,
+             1071: 8280, 140: 8260, 184: 8240, 235: 8220, 1080: 8200, 1156: 6500,
+             1182: 5600, 1227: 2500}
 SEARCH_PRIO = [120, 5, 121, 119, 184, 235, 140, 2, 1071, 1079, 1227, 1182, 1086, 1121]
+
+# リプレイ631決定からBradley-Terry風にフィットした大域ランキング(MAIN用)
+FITTED_MAIN = {"PLAY:1079": 5.82, "PLAY:119": 4.19, "ATTACH:A:1071": 3.55, "ABILITY": 3.24, "PLAY:1120": 3.17, "EVOLVE:121": 2.56, "PLAY:140": 2.28, "EVOLVE:120": 1.74, "ATTACK:Phantom Dive": 1.39, "PLAY:235": 1.33, "PLAY:1256": 1.27, "PLAY:184": 1.18, "PLAY:1152": 1.05, "PLAY:1086": 0.91, "PLAY:1227": 0.87, "ATTACH:B:121": 0.82, "ATTACH:A:121": 0.76, "PLAY:1080": 0.74, "ATTACH:A:140": 0.73, "ATTACH:B:119": 0.70, "PLAY:1198": 0.60, "PLAY:1182": 0.45, "PLAY:1210": 0.38, "PLAY:1121": 0.37, "ATTACH:A:235": 0.31, "ATTACH:B:120": -0.12, "PLAY:1071": -0.15, "PLAY:1097": -0.23, "ATTACH:A:119": -0.36, "ATTACH:A:120": -0.48, "ATTACH:A:184": -0.54, "ATTACK:Itchy Pollen": -0.86, "ATTACK:Jet Headbutt": -0.87, "ATTACK:Bite": -1.09, "RETREAT": -1.45, "ATTACK:Petty Grudge": -2.05, "END": -2.23, "ATTACK:Dragon Headbutt": -4.12, "ATTACH:B:1071": -6.13, "ATTACH:B:184": -6.47, "ATTACH:B:235": -6.49, "ATTACH:B:140": -6.80}
 
 _CARDS = None
 _ATKS = None
@@ -110,52 +115,25 @@ def make_top_dragapult_pilot():
                     return [i]
             return [0]
 
-        # --- MAIN ---
+        # --- MAIN: フィット済み大域ランキングで選択 ---
         if ctx == 0 and mc <= 1:
-            best_i, best_s = 0, -1.0
-            active = (_g(mp_, "active", []) or [None])
-            active = active[0] if active else None
-            act_id = _g(active, "id") if active else None
-            for i, o in enumerate(opts):
+            def main_label(o):
                 t = _g(o, "type")
-                s = 50.0
-                if t == 10:
-                    s = 10000  # 特性は常に使う
-                elif t == 9:
-                    cid = hand_card(mp_, _g(o, "index"))
-                    s = 9500 + (200 if cid == DRAKLOAK else (100 if cid == DRAGAPULT else 0))
-                elif t == 7:
-                    cid = hand_card(mp_, _g(o, "index"))
-                    s = PLAY_PRIO.get(cid, 6000)
-                    if cid == 1227:  # Lillie's は手札が細い時だけ
-                        hc = len(_g(mp_, "hand", []) or [])
-                        s = 7100 if hc <= 4 else 3000
-                elif t == 8:
+                if t == 7:
+                    return f"PLAY:{hand_card(mp_, _g(o, 'index'))}"
+                if t == 9:
+                    return f"EVOLVE:{hand_card(mp_, _g(o, 'index'))}"
+                if t == 8:
                     tgt = inplay(pls, me, _g(o, "inPlayArea"), _g(o, "inPlayIndex"))
-                    tid = _g(tgt, "id")
-                    ecnt = len(_g(tgt, "energies", []) or []) if tgt else 0
-                    if _g(o, "inPlayArea") == 5 and tid in (DRAGAPULT, DRAKLOAK, DREEPY) and ecnt < 2:
-                        s = 8100 - ecnt * 10
-                    elif _g(o, "inPlayArea") == 4 and tid == DRAGAPULT and ecnt < 2:
-                        s = 8050
-                    else:
-                        s = 4000
-                elif t == 13:
+                    ab = "A" if _g(o, "inPlayArea") == 4 else "B"
+                    return f"ATTACH:{ab}:{_g(tgt, 'id')}"
+                if t == 13:
                     a = atks.get(_g(o, "attackId"))
-                    nm_ = _g(a, "name", "") if a else ""
-                    if nm_ == PHANTOM_DIVE_NAME:
-                        s = 6000
-                    elif nm_ == "Itchy Pollen" and turn <= 6:
-                        s = 5800
-                    else:
-                        s = 5200
-                elif t == 12:
-                    bench = [p for p in (_g(mp_, "bench", []) or []) if p]
-                    ready = any(_g(p, "id") == DRAGAPULT and len(_g(p, "energies", []) or []) >= 2
-                                for p in bench)
-                    s = 5900 if (ready and act_id in (BUDEW, DREEPY) and turn > 6) else 1000
-                elif t == 14:
-                    s = 100
+                    return f"ATTACK:{_g(a, 'name', '?') if a else '?'}"
+                return {10: "ABILITY", 12: "RETREAT", 14: "END", 11: "DISCARD"}.get(t, f"t{t}")
+            best_i, best_s = 0, -1e18
+            for i, o in enumerate(opts):
+                s = FITTED_MAIN.get(main_label(o), -3.0)
                 if s > best_s:
                     best_s, best_i = s, i
             return [best_i]
