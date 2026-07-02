@@ -31,6 +31,7 @@ engine/
 !submissions/archaludon_agent.py
 !submissions/archaludon_search_agent.py
 !submissions/megastarmie_search_agent.py
+!submissions/dragapult_hybrid_agent.py
 
 # 対戦ログ(ローカル生成物)
 logs/
